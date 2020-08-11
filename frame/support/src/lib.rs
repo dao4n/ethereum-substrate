@@ -37,6 +37,8 @@ pub use codec;
 pub use once_cell;
 #[doc(hidden)]
 pub use paste;
+#[doc(hidden)]
+pub use scale_info;
 #[cfg(feature = "std")]
 #[doc(hidden)]
 pub use sp_state_machine::BasicExternalities;
@@ -103,7 +105,7 @@ pub enum Never {}
 ///
 /// - Using `static` to create a static parameter type. Its value is
 ///   being provided by a static variable with the equivalent name in `UPPER_SNAKE_CASE`. An
-///   additional `set` function is provided in this case to alter the static variable. 
+///   additional `set` function is provided in this case to alter the static variable.
 ///
 /// **This is intended for testing ONLY and is ONLY available when `std` is enabled**
 ///
