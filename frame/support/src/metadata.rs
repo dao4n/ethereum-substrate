@@ -297,12 +297,15 @@ mod tests {
 		type SignedExtensions = (TestExtension, TestExtension2);
 	}
 
-	mod system {
+	#[frame_support::pallet(System)]
+	mod frame_system {
 		use super::*;
+		use frame_support::pallet_prelude::*; // Import various types used in pallet definition
 
 		/// Kind of alias for `Config` trait. Deprecated as `Trait` is renamed `Config`.
 		pub trait Trait: Config {}
 		impl<T: Config> Trait for T {}
+		#[pallet::trait_]
 		pub trait Config: 'static {
 			type BaseCallFilter;
 			const ASSOCIATED_CONST: u64 = 500;
@@ -316,20 +319,23 @@ mod tests {
 			type Call;
 		}
 
-		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {
-				/// Hi, I am a comment.
-				const BlockNumber: T::BlockNumber = 100.into();
-				const GetType: T::AccountId = T::SomeValue::get().into();
-				const ASSOCIATED_CONST: u64 = T::ASSOCIATED_CONST.into();
-			}
+		pub type OriginFor<T> = <T as Trait>::Origin;
+		pub type BlockNumberFor<T> = <T as Trait>::BlockNumber;
+
+		#[pallet::module]
+		pub struct Module<T>(PhantomData<T>);
+
+		#[pallet::module_interface]
+		impl<T: Trait> ModuleInterface<BlockNumberFor<T>> for Module<T> {
 		}
 
-		decl_event!(
-			pub enum Event {
-				SystemEvent,
-			}
-		);
+		#[pallet::call]
+		impl<T: Trait> Call for Module<T> {}
+
+		#[pallet::event]
+		pub enum Event {
+			SystemEvent,
+		}
 
 		#[derive(Clone, PartialEq, Eq, Debug, Encode, Decode)]
 		pub enum RawOrigin<AccountId> {
@@ -354,7 +360,7 @@ mod tests {
 		use crate::dispatch::DispatchResult;
 		use super::system;
 
-		pub trait Trait: system::Trait {
+		pub trait Trait: super::frame_system::Trait {
 			type Balance;
 		}
 
@@ -422,14 +428,14 @@ mod tests {
 
 	impl_outer_event! {
 		pub enum TestEvent for TestRuntime {
-			system,
+			frame_system,
 			event_module<T>,
 			event_module2<T>,
 		}
 	}
 
 	impl_outer_origin! {
-		pub enum Origin for TestRuntime where system = system {}
+		pub enum Origin for TestRuntime where system = frame_system {}
 	}
 
 	impl_outer_dispatch! {
@@ -451,7 +457,7 @@ mod tests {
 		pub const SystemValue: u32 = 600;
 	}
 
-	impl system::Config for TestRuntime {
+	impl frame_system::Config for TestRuntime {
 		type BaseCallFilter = ();
 		type Origin = Origin;
 		type AccountId = u32;
@@ -486,7 +492,7 @@ mod tests {
 	struct ConstantAssociatedConstByteGetter;
 	impl DefaultByte for ConstantAssociatedConstByteGetter {
 		fn default_byte(&self) -> Vec<u8> {
-			<TestRuntime as system::Config>::ASSOCIATED_CONST.encode()
+			<TestRuntime as frame_system::Config>::ASSOCIATED_CONST.encode()
 		}
 	}
 
