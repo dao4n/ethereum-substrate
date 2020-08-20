@@ -500,35 +500,56 @@ macro_rules! __impl_outer_event_json_metadata {
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
-	use super::*;
 	use serde::Serialize;
 	use codec::{Encode, Decode};
+	use sp_runtime::traits::Member;
 
-	mod system {
+	#[frame_support::pallet(System)]
+	mod frame_system {
 		/// Kind of alias for `Config` trait. Deprecated as `Trait` is renamed `Config`.
 		pub trait Trait: Config {}
 		impl<T: Config> Trait for T {}
 		pub trait Config: 'static {
-			type Origin;
-			type BlockNumber;
+			type Origin: Member
+				+ codec::Codec
+				+ scale_info::TypeInfo;
+			type BlockNumber: Member
+				+ codec::Codec
+				+ scale_info::TypeInfo;
 			type PalletInfo: crate::traits::PalletInfo;
 			type DbWeight: crate::traits::Get<crate::weights::RuntimeDbWeight>;
 		}
 
-		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {}
+		// emulate the actual frame_system module exports
+		pub mod pallet_prelude {
+			pub type OriginFor<T> = <T as super::Trait>::Origin;
+			pub type BlockNumberFor<T> = <T as super::Trait>::BlockNumber;
 		}
 
-		decl_event!(
-			pub enum Event {
-				SystemEvent,
-			}
-		);
+		#[pallet::module]
+		pub struct Module<T>(PhantomData<T>);
+
+		#[pallet::module_interface]
+		impl<T: Trait> ModuleInterface<pallet_prelude::BlockNumberFor<T>> for Module<T> {
+		}
+
+		#[pallet::call]
+		impl<T: Trait> Call for Module<T> {}
+
+		#[pallet::event]
+		pub enum Event {
+			SystemEvent,
+		}
 	}
 
+	#[frame_support::pallet(SystemRenamed)]
 	mod system_renamed {
-		/// Kind of alias for `Config` trait. Deprecated as `Trait` is renamed `Config`.
-		pub trait Trait: Config {}
+		use super::frame_system;
+		use super::frame_system::pallet_prelude::*;
+		use frame_support::pallet_prelude::*;
+
+		#[pallet::trait_]
+		pub trait Trait: frame_system::Config {}
 		impl<T: Config> Trait for T {}
 		pub trait Config: 'static {
 			type Origin;
@@ -537,117 +558,119 @@ mod tests {
 			type DbWeight: crate::traits::Get<crate::weights::RuntimeDbWeight>;
 		}
 
-		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=self {}
+		#[pallet::module]
+		pub struct Module<T>(PhantomData<T>);
+
+		#[pallet::module_interface]
+		impl<T: Trait> ModuleInterface<BlockNumberFor<T>> for Module<T> {
 		}
 
-		decl_event!(
-			pub enum Event {
-				SystemEvent,
-			}
-		);
+		#[pallet::call]
+		impl<T: Trait> Call for Module<T> {}
+
+		#[pallet::event]
+		pub enum Event {
+			SystemEvent,
+		}
 	}
 
+	#[frame_support::pallet(EventModule)]
 	mod event_module {
-		use super::system;
+		use frame_support::pallet_prelude::*;
+		use super::*;
+		use super::frame_system::pallet_prelude::*;
+		use super::frame_system;
 
-		pub trait Trait: system::Trait {
-			type Balance;
+		#[pallet::trait_]
+		pub trait Trait: frame_system::Trait {
+			type Balance: Member
+				+ codec::Codec
+				+ scale_info::TypeInfo // todo: [AJ] only for std, and embed encoded on build?
+				+ codec::HasCompact; // todo: [AJ] can we remove this?
 		}
 
-		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=system {}
+		#[pallet::module]
+		pub struct Module<T>(PhantomData<T>);
+
+		#[pallet::module_interface]
+		impl<T: Trait> ModuleInterface<BlockNumberFor<T>> for Module<T> {
 		}
 
-		decl_event!(
-			/// Event without renaming the generic parameter `Balance` and `Origin`.
-			pub enum Event<T> where <T as Trait>::Balance, <T as system::Config>::Origin
-			{
-				/// Hi, I am a comment.
-				TestEvent(Balance, Origin),
-				/// Dog
-				EventWithoutParams,
-			}
-		);
+		#[pallet::call]
+		impl<T: Trait> Call for Module<T> {}
+
+		type BalanceFor<T> = <T as Trait>::Balance;
+
+		/// Event without renaming the generic parameter `Balance` and `Origin`.
+		#[pallet::event]
+		#[pallet::metadata(BalanceFor<T> = Balance, OriginFor<T> = Origin)]
+		pub enum Event<T: Trait> {
+			/// Hi, I am a comment.
+			TestEvent(BalanceFor<T>, OriginFor<T>),
+			/// Dog
+			EventWithoutParams,
+		}
 	}
 
+	#[frame_support::pallet(EventModule2)]
 	mod event_module2 {
-		use super::system;
+		use frame_support::pallet_prelude::*;
+		use super::*;
+		use super::frame_system::pallet_prelude::*;
+		use super::frame_system;
 
-		pub trait Trait: system::Trait {
-			type Balance;
+		#[pallet::trait_]
+		pub trait Trait: frame_system::Trait {
+			type Balance: Member
+			+ codec::Codec
+			+ scale_info::TypeInfo // todo: [AJ] only for std, and embed encoded on build?
+			+ codec::HasCompact; // todo: [AJ] can we remove this?
 		}
 
-		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=system {}
+		#[pallet::module]
+		pub struct Module<T>(PhantomData<T>);
+
+		#[pallet::module_interface]
+		impl<T: Trait> ModuleInterface<BlockNumberFor<T>> for Module<T> {
 		}
 
-		decl_event!(
-			/// Event with renamed generic parameter
-			pub enum Event<T> where
-				BalanceRenamed = <T as Trait>::Balance,
-				OriginRenamed = <T as system::Config>::Origin
-			{
-				TestEvent(BalanceRenamed),
-				TestOrigin(OriginRenamed),
-			}
-		);
+		#[pallet::call]
+		impl<T: Trait> Call for Module<T> {}
+
+		type BalanceFor<T> = <T as Trait>::Balance;
+
+		/// Event with renamed generic parameter
+		#[pallet::event]
+		#[pallet::metadata(BalanceFor<T> = BalanceRenamed, OriginFor<T> = OriginRenamed)]
+		pub enum Event<T: Trait> {
+			TestEvent(BalanceFor<T>),
+			TestOrigin(OriginFor<T>),
+		}
 	}
 
+	#[frame_support::pallet(EventModule3)]
 	mod event_module3 {
-		decl_event!(
-			pub enum Event {
-				HiEvent,
-			}
-		);
-	}
+		use frame_support::pallet_prelude::*;
+		use super::frame_system::pallet_prelude::*;
+		use super::frame_system;
 
-	mod event_module4 {
-		use super::system;
+		#[pallet::trait_]
+		pub trait Trait: frame_system::Trait {}
 
-		pub trait Trait: system::Trait {
-			type Balance;
+		#[pallet::module]
+		pub struct Module<T>(PhantomData<T>);
+
+		#[pallet::module_interface]
+		impl<T: Trait> ModuleInterface<BlockNumberFor<T>> for Module<T> {
 		}
 
-		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=system {}
+		#[pallet::call]
+		impl<T: Trait> Call for Module<T> {}
+
+		#[pallet::event]
+		pub enum Event {
+			HiEvent,
 		}
-
-		decl_event!(
-			/// Event finish formatting on an unnamed one with trailing comma
-			pub enum Event<T> where
-				<T as Trait>::Balance,
-				<T as system::Config>::Origin,
-			{
-				TestEvent(Balance, Origin),
-			}
-		);
-	}
-
-	mod event_module5 {
-		use super::system;
-
-		pub trait Trait: system::Trait {
-			type Balance;
-		}
-
-		decl_module! {
-			pub struct Module<T: Trait> for enum Call where origin: T::Origin, system=system {}
-		}
-
-		decl_event!(
-			/// Event finish formatting on an named one with trailing comma
-			pub enum Event<T> where
-				BalanceRenamed = <T as Trait>::Balance,
-				OriginRenamed = <T as system::Config>::Origin,
-			{
-				TestEvent(BalanceRenamed, OriginRenamed),
-				TrailingCommaInArgs(
-					u32,
-					u32,
-				),
-			}
-		);
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize)]
@@ -655,19 +678,7 @@ mod tests {
 
 	impl_outer_event! {
 		pub enum TestEvent for TestRuntime {
-			system,
-			event_module<T>,
-			event_module2<T>,
-			event_module3,
-		}
-	}
-
-	#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize)]
-	pub struct TestRuntime2;
-
-	impl_outer_event! {
-		pub enum TestEventSystemRenamed for TestRuntime2 {
-			system_renamed,
+			frame_system,
 			event_module<T>,
 			#[codec(index = "5")] event_module2<T>,
 			event_module3,
@@ -682,94 +693,98 @@ mod tests {
 		type Balance = u32;
 	}
 
-	impl system::Config for TestRuntime {
+	impl frame_system::Trait for TestRuntime {
 		type Origin = u32;
 		type BlockNumber = u32;
 		type PalletInfo = ();
 		type DbWeight = ();
 	}
 
-	impl event_module::Trait for TestRuntime2 {
-		type Balance = u32;
-	}
-
-	impl event_module2::Trait for TestRuntime2 {
-		type Balance = u32;
-	}
-
-	impl system_renamed::Config for TestRuntime2 {
-		type Origin = u32;
-		type BlockNumber = u32;
-		type PalletInfo = ();
-		type DbWeight = ();
-	}
-
-	impl system::Config for TestRuntime2 {
-		type Origin = u32;
-		type BlockNumber = u32;
-		type PalletInfo = ();
-		type DbWeight = ();
-	}
-
-	const EXPECTED_METADATA: vnext::OuterEventMetadata = OuterEventMetadata {
-		name: DecodeDifferent::Encode("TestEvent"),
-		events: DecodeDifferent::Encode(&[
-			(
-				"system",
-				FnEncode(|| &[
-					EventMetadata {
-						name: DecodeDifferent::Encode("SystemEvent"),
-						arguments: DecodeDifferent::Encode(&[]),
-						documentation: DecodeDifferent::Encode(&[]),
-					}
-				])
-			),
-			(
-				"event_module",
-				FnEncode(|| &[
-					EventMetadata {
-						name: DecodeDifferent::Encode("TestEvent"),
-						arguments: DecodeDifferent::Encode(&[ "Balance", "Origin" ]),
-						documentation: DecodeDifferent::Encode(&[ " Hi, I am a comment." ])
-					},
-					EventMetadata {
-						name: DecodeDifferent::Encode("EventWithoutParams"),
-						arguments: DecodeDifferent::Encode(&[]),
-						documentation: DecodeDifferent::Encode(&[ " Dog" ]),
-					},
-				])
-			),
-			(
-				"event_module2",
-				FnEncode(|| &[
-					EventMetadata {
-						name: DecodeDifferent::Encode("TestEvent"),
-						arguments: DecodeDifferent::Encode(&[ "BalanceRenamed" ]),
-						documentation: DecodeDifferent::Encode(&[])
-					},
-					EventMetadata {
-						name: DecodeDifferent::Encode("TestOrigin"),
-						arguments: DecodeDifferent::Encode(&[ "OriginRenamed" ]),
-						documentation: DecodeDifferent::Encode(&[]),
-					},
-				])
-			),
-			(
-				"event_module3",
-				FnEncode(|| &[
-					EventMetadata {
-						name: DecodeDifferent::Encode("HiEvent"),
-						arguments: DecodeDifferent::Encode(&[]),
-						documentation: DecodeDifferent::Encode(&[])
-					}
-				])
-			)
-		])
-	};
+	// todo: [AJ] restore this with renamed system module for proc macro?
+	// #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Serialize)]
+	// pub struct TestRuntime2;
+	//
+	// impl_outer_event! {
+	// 	pub enum TestEventSystemRenamed for TestRuntime2 {
+	// 		system_renamed,
+	// 		event_module<T>,
+	// 		event_module2<T>,
+	// 		event_module3,
+	// 	}
+	// }
+	// impl event_module::Trait for TestRuntime2 {
+	// 	type Balance = u32;
+	// }
+	//
+	// impl event_module2::Trait for TestRuntime2 {
+	// 	type Balance = u32;
+	// }
+	//
+	// impl system_renamed::Trait for TestRuntime2 {
+	// 	type Origin = u32;
+	// 	type BlockNumber = u32;
+	// }
 
 	#[test]
 	fn outer_event_metadata() {
-		assert_eq!(EXPECTED_METADATA, TestRuntime::outer_event_metadata());
+		let expected_metadata = crate::metadata::vnext::OuterEventMetadata {
+			name: "TestEvent",
+			events: vec![],
+
+			// DecodeDifferent::Encode(&[
+			// 	(
+			// 		"system",
+			// 		FnEncode(|| &[
+			// 			EventMetadata {
+			// 				name: DecodeDifferent::Encode("SystemEvent"),
+			// 				arguments: DecodeDifferent::Encode(&[]),
+			// 				documentation: DecodeDifferent::Encode(&[]),
+			// 			}
+			// 		])
+			// 	),
+			// 	(
+			// 		"event_module",
+			// 		FnEncode(|| &[
+			// 			EventMetadata {
+			// 				name: DecodeDifferent::Encode("TestEvent"),
+			// 				arguments: DecodeDifferent::Encode(&[ "Balance", "Origin" ]),
+			// 				documentation: DecodeDifferent::Encode(&[ " Hi, I am a comment." ])
+			// 			},
+			// 			EventMetadata {
+			// 				name: DecodeDifferent::Encode("EventWithoutParams"),
+			// 				arguments: DecodeDifferent::Encode(&[]),
+			// 				documentation: DecodeDifferent::Encode(&[ " Dog" ]),
+			// 			},
+			// 		])
+			// 	),
+			// 	(
+			// 		"event_module2",
+			// 		FnEncode(|| &[
+			// 			EventMetadata {
+			// 				name: DecodeDifferent::Encode("TestEvent"),
+			// 				arguments: DecodeDifferent::Encode(&[ "BalanceRenamed" ]),
+			// 				documentation: DecodeDifferent::Encode(&[])
+			// 			},
+			// 			EventMetadata {
+			// 				name: DecodeDifferent::Encode("TestOrigin"),
+			// 				arguments: DecodeDifferent::Encode(&[ "OriginRenamed" ]),
+			// 				documentation: DecodeDifferent::Encode(&[]),
+			// 			},
+			// 		])
+			// 	),
+			// 	(
+			// 		"event_module3",
+			// 		FnEncode(|| &[
+			// 			EventMetadata {
+			// 				name: DecodeDifferent::Encode("HiEvent"),
+			// 				arguments: DecodeDifferent::Encode(&[]),
+			// 				documentation: DecodeDifferent::Encode(&[])
+			// 			}
+			// 		])
+			// 	)
+			// ])
+		};
+		assert_eq!(expected_metadata, TestRuntime::outer_event_metadata());
 	}
 
 	#[test]
@@ -783,7 +798,7 @@ mod tests {
 			event_module2::Event::<TestRuntime2>::TestEvent(3)
 		);
 		assert_eq!(runtime_2_event_module_2.encode()[0], 5);
-		
+
 		let runtime_2_event_module_3 = TestEventSystemRenamed::event_module3(
 			event_module3::Event::HiEvent
 		);

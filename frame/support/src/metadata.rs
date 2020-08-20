@@ -254,9 +254,7 @@ macro_rules! __runtime_modules_to_metadata_calls_storage {
 #[allow(dead_code)]
 mod tests {
 	use super::*;
-	use frame_metadata::{
-		RuntimeMetadataPrefixed, DefaultByte
-	};
+	use frame_metadata::DefaultByte;
 	use codec::{Encode, Decode};
 	use crate::traits::Get;
 	use scale_info::{Registry, IntoCompact};
@@ -322,8 +320,11 @@ mod tests {
 			type Call;
 		}
 
-		pub type OriginFor<T> = <T as Trait>::Origin;
-		pub type BlockNumberFor<T> = <T as Trait>::BlockNumber;
+		// emulate the actual frame_system module exports
+		pub mod pallet_prelude {
+			pub type OriginFor<T> = <T as super::Trait>::Origin;
+			pub type BlockNumberFor<T> = <T as super::Trait>::BlockNumber;
+		}
 
 		#[pallet::module]
 		pub struct Module<T>(PhantomData<T>);
@@ -431,9 +432,9 @@ mod tests {
 		type BalanceOf<T> = <T as Trait>::Balance;
 
 		#[pallet::event]
-		#[pallet::metadata(BalanceOf<T> = Balance)]
+		#[pallet::metadata(T::Balance = Balance)]
 		pub enum Event<T: Trait> {
-			TestEvent(BalanceOf<T>),
+			TestEvent(T::Balance),
 		}
 
 		#[pallet::storage] #[allow(type_alias_bounds)]
